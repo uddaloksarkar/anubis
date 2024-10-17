@@ -1,0 +1,9 @@
+[submodule "human-eval"]
+	path = human-eval
+	url = org-14957082@github.com:openai/human-eval.git
+[submodule "humal_eval"]
+	path = humal_eval
+	url = org-14957082@github.com:openai/human-eval.git
+[submodule "human_eval"]
+	path = human_eval
+	url = org-14957082@github.com:openai/human-eval.git

@@ -1,0 +1,11 @@
+accelerate==1.0.1
+fire==0.7.0
+gmpy2==2.1.5
+matplotlib==3.9.2
+networkx==3.4.1
+numpy==2.1.2
+rich==13.9.2
+setuptools==65.5.0
+torch==2.4.1
+tqdm==4.66.5
+transformers==4.45.2
