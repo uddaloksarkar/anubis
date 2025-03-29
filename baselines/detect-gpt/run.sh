@@ -1,0 +1,1 @@
+python -m pdb run.py --output_name main --base_model_name deepseek-ai/deepseek-coder-1.3b-base --n_perturbation_list 1,10 --n_samples 100 --pct_words_masked 0.3 --span_length 2 --batch_size 10 --skip_baselines

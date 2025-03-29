@@ -11,7 +11,7 @@ import sys
 import torch, torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from transformers import set_seed, GenerationConfig
-from transformers import AutoTokenizer, GPT2Tokenizer, GPT2Model, GPT2LMHeadModel, AdamW, AutoModelForCausalLM
+from transformers import AutoTokenizer, GPT2Tokenizer, GPT2Model, GPT2LMHeadModel, AutoModelForCausalLM
 from transformers.generation.logits_process import LogitsProcessorList, TopPLogitsWarper
 import locale
 import gmpy2
@@ -29,10 +29,6 @@ locale.getpreferredencoding = lambda: "UTF-8"
 
 torch_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 gmpy2.set_context(gmpy2.context())
-
-models_folder = "trained_models"
-if not os.path.exists(models_folder):
-   os.mkdir(models_folder)
 
 
 def _prsample(prompt, model, tokenizer, gen_config, stopping_criteria, seed):
@@ -74,6 +70,85 @@ def _prsample(prompt, model, tokenizer, gen_config, stopping_criteria, seed):
                 condProbs[k].append(mpfr(probs[k][tok].item()))
             
     return gen_text, prob, outputs.sequences, condProbs
+
+
+def _prsamplefast(prompt, model, tokenizer, gen_config, stopping_criteria, seed):
+    r"""
+     _prsample (probablity revealing sample) returns a sampled sentence (token sequence) along 
+     with its generation probability. 
+    """
+    set_seed(seed)
+    
+    encoded_input = tokenizer(prompt, return_tensors='pt').to(torch_device)
+    
+    outputs = model.generate(**encoded_input, generation_config=gen_config, stopping_criteria = stopping_criteria, pad_token_id=tokenizer.eos_token_id)
+
+    gen_sequences = outputs.sequences[:, encoded_input.input_ids.shape[-1]:]
+    # gen_text = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True)
+    gen_text = []
+    decodedtext = tokenizer.batch_decode(gen_sequences, skip_special_tokens=True)
+    for text in decodedtext:
+        gen_text.append(prompt + text) 
+        # todo : is it pefect?
+    
+    i = 0; prob = [1] * gen_config.num_return_sequences
+    condProbs = [[] for i in range(gen_config.num_return_sequences)]
+
+    # outputs.scores : tuple of generation length
+    # gen_sequences : tensor of num_return_sequence x generation length
+    # probs : num_return_sequences many distributions
+
+    for i in range(len(outputs.scores)):
+        probs = nn.functional.softmax(outputs.scores[i], dim=-1)
+        assert len(probs) == gen_config.num_return_sequences
+        for k in range(gen_config.num_return_sequences): 
+            tok = gen_sequences[k][i]
+            if tok == model.config.eos_token_id:
+                prob[k] *= mpfr(1)
+                condProbs[k].append(mpfr(1))
+            else:
+                prob[k] *= mpfr(probs[k][tok].item())
+                condProbs[k].append(mpfr(probs[k][tok].item()))
+            
+    return gen_text, prob, outputs.sequences, condProbs
+
+
+def _evalfast(prompt, model, tokenizer, texts, generation_config):
+    r"""
+     _evalfast (evaluate) returns the generation probability of a sentence (token sequence) in a model . 
+     this version of _eval assumes logits access to the model.
+    """
+    # set_seed(seed)
+
+    tokenizer.pad_token = tokenizer.eos_token 
+    encoded_text = tokenizer(texts, return_tensors='pt', padding=True).to(torch_device)
+
+    input_ids = encoded_text["input_ids"]
+
+    # Pass through model to get logits
+    with torch.no_grad():
+        outputs = model(input_ids)
+
+    logits = outputs.logits  # Shape: (batch_size, seq_len, vocab_size)
+
+    # Apply softmax to get probabilities
+    probs = torch.nn.functional.softmax(logits, dim=-1)
+
+    # Identify which part is the generated text
+    gen_start = len(tokenizer.encode(prompt, add_special_tokens=False))
+
+    # Extract probabilities for only the generated part
+    token_probs = []
+    sequence_probs = []
+
+    for i in range(probs.shape[0]): #bathc size
+        gen_token_probs = probs[i, gen_start - 1:-1, :].gather(1, input_ids[i, gen_start:].unsqueeze(-1)).squeeze(-1)
+        sequence_prob = mpfr(1)
+        for i in range(len(gen_token_probs)):
+            sequence_prob *= mpfr(gen_token_probs[i].item())
+        sequence_probs.append(sequence_prob)
+        
+    return sequence_probs
 
 
 def _eval_no_logits(prompt, model, tokenizer, encoded_text, generation_config, seed):

@@ -53,13 +53,13 @@ parser.add_argument('--promptsrc', type=int,
                         default=0, dest='promptsrc', help="1 = TruthfulQA, 0 = HumanEval")
 parser.add_argument('--num_prompts', type=int,
                         default=1, dest='num_prompts')
-parser.add_argument('--taskID', type=int, 
+parser.add_argument('--start_at', type=int, 
                         default=0, dest='start_at')
-parser.add_argument('--batch_size', type=int,
+parser.add_argument('--b', type=int,
                         default=10, dest='batch_size')
 parser.add_argument('--smpsrc', type=str, help="path to the sample files directory", dest='src')
-parser.add_argument('--evalmodelID', type=int,
-                        default=0, help="1 = deepseek, 0 = stability, 2 = gpt", dest='evalmodel')
+parser.add_argument('--evalmodel', type=int,
+                        default=0, help="1 = deepseek, 0 = stability, 2 = gemma", dest='evalmodel')
 parser.add_argument('--debug', type=int,
                         default=0, help="2 for memory debugging, 1 for normal Debugging, 0 else", dest='debug')
 parser.add_argument('--verbose', type=int,
@@ -123,8 +123,8 @@ elif evalmodel == 1:
     evalmodelname = "deepseek"
     evalmodelid = 'deepseek-ai/deepseek-coder-1.3b-base'
 elif evalmodel == 2:
-    evalmodelname = "gpt"
-    evalmodelid = 'gpt2'
+    evalmodelname = "codegemma"
+    evalmodelid = 'google/codegemma-2b'
 elif evalmodel == 3:
     evalmodelname = "codellama"
     evalmodelid = 'codellama/CodeLlama-7b-Python-hf'
@@ -165,7 +165,7 @@ if (processrankStr == None):
 jobid = os.environ.get('PBS_JOBID', None)
 jobint = (jobid.split('.')[0] if jobid is not None else 0)
 jobFolder = f'{corpusprefixFolder}/j-{jobint}'
-folder = samp_src 
+folder = samp_src #'j-6529592/stability/'
 evalfolder = jobFolder + '/' + evalmodelname + '/'
 os.system('mkdir -p ' +jobFolder + ' ' + evalfolder)
 os.system(f'echo Sample Source: {folder} > {evalfolder}/README.txt')
@@ -231,7 +231,7 @@ with accelerator.split_between_processes(promptbuff) as prompts:
                     cuda.memory._dump_snapshot(f"checkmem-do-eval-probe2.pickle")
                 except Exception as e:
                     logger.error(f"Failed to capture memory snapshot {e}")
-            score, condprobs, enc= _evalwithchoices(prompt, evalmodel, tokenizer, samp_batch, gen_config, collision_list)
+            score, condprobs, enc= _eval(prompt, evalmodel, tokenizer, samp_batch, gen_config, collision_list)
             evalscores += [float(iscore) for iscore in score]
             sampleids += samp_batch
             

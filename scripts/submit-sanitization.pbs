@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -N Sanitize-Code
+#PBS -o log
+#PBS -j oe
+#PBS -l walltime=01:30:00
+#PBS -q normal
+#PBS -m abe
+#PBS -l select=4:ncpus=41:mpiprocs=41:mem=150G
+
+cd  ${PBS_O_WORKDIR}
+[ -d log ] || mkdir log
+
+mpirun python3 run-sanitization.py

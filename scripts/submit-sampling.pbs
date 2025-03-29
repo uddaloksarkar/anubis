@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -N Anubis-dataset
+#PBS -o log
+#PBS -j oe
+#PBS -l walltime=24:00:00
+#PBS -q normal
+#PBS -m abe
+#PBS -l select=1:ngpus=4
+
+cd  ${PBS_O_WORKDIR}
+[ -d log ] || mkdir log
+
+mpirun time accelerate launch --num_processes 4 get-samples.py  --b 10  --start_at 150 --num_prompts 14 --samples 4000 --model 2 --seed 0 --ndim 100 --topp 0.95 --temperature 0.8

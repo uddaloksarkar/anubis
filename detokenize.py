@@ -25,7 +25,7 @@ def get_collisions(tokenizer):
         except IndexError:
             print(retok)
         if [tok] != retok:
-            collision[tuple(retok)] = [tok, gen_text]
+            collision[tuple(retok)] = [tok]#, gen_text]
     with contextlib.suppress(KeyError):
         collision.pop(())
     return collision
@@ -86,3 +86,66 @@ if __name__ == '__main__':
             print(key, collision[key])
     print(maxlen)
     print(len(collision))
+    '''
+    enc = tiktoken.get_encoding("cl100k_base")
+    nclash = 0
+    edges = []
+
+    if tok is None:
+        for tok in track(range(50152)):
+            gen_text = tokenizer.batch_decode([tok],  skip_special_tokens = True)
+            # gen_text = enc.decode([tok])
+            try:
+                detok = tokenizer(gen_text)['input_ids'][0][-1]
+                # detok = enc.encode(gen_text)
+            except IndexError:
+                print("end tok:", tok, '\n', gen_text)
+                continue
+            #     break
+            if gen_text == ['']: break
+            for txt in gen_text: 
+                txt1 = [ord(char) for char in txt]
+            if tok != detok:
+                edges.append((tok,detok))
+                print(tok, "==##==", detok, "==##==", txt)#, "==##==", txt1)
+                nclash += 1
+        print(nclash)
+        print("fracclashes:", nclash/tok)
+        # gen_text = tokenizer.batch_decode([tok])
+        # print(gen_text)
+        # print(tokenizer(gen_text)['input_ids'])
+
+        # Create a directed graph
+        G = nx.DiGraph()
+
+        # Add edges
+        G.add_edges_from(edges)
+
+        # Visualize the graph
+        pos = nx.spring_layout(G)  # positions for all nodes
+        nx.draw(G, pos, node_size=1, node_color="skyblue", arrows=True)
+
+        # Show the graph
+        plt.savefig('tokdag.png')
+
+        if has_cycle := nx.recursive_simple_cycles(G):
+            print("The graph contains cycles:", has_cycle)
+        else:
+            print("The graph does not contain any cycles.")
+
+        # Find the longest path
+        longest_path = nx.algorithms.dag.dag_longest_path(G)
+        print("The longest path in the graph is:", longest_path)
+
+        print("number of connected components:", nx.number_strongly_connected_components(G))
+    else:
+
+        # gen_text = enc.decode([tok])
+        # detok = enc.encode(gen_text)
+        gen_text = tokenizer.batch_decode([tok],  skip_special_tokens = True)
+        try:
+            detok = tokenizer(gen_text)['input_ids'][0][-1]
+            print("tok:", tok, '\n', gen_text, '\n detok:', detok)
+        except IndexError:
+            print("end tok:", tok, '\n', gen_text)
+        '''

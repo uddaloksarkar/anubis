@@ -25,17 +25,17 @@ gmpy2.set_context(gmpy2.context())
 # Parse CL inputs
 parser = argparse.ArgumentParser()
 parser.add_argument('--promptsrc', type=int,
-                        default=0, dest='promptsrc', help="0 = HumanEval")
+                        default=0, dest='promptsrc', help="1 = TruthfulQA, 0 = HumanEval")
 parser.add_argument('--num_prompts', type=int,
                         default=1, dest='num_prompts')
-parser.add_argument('--taskID', type=int, 
+parser.add_argument('--start_at', type=int, 
                         default=0, dest='start_at')
 parser.add_argument('--samples', type=int,
                         default=30, dest='m')
-parser.add_argument('--batch_size', type=int,
+parser.add_argument('--b', type=int,
                         default=10, dest='batch_size')
-parser.add_argument('--modelID', type=int,
-                        default=0, help="2 = codegemma, 1 = deepseek, 0 = stability",dest='model')
+parser.add_argument('--model', type=int,
+                        default=0, help="2 = gpt, 1 = deepseek, 0 = stability",dest='model')
 parser.add_argument('--debug', type=int,
                         default=0, help="1 for Normal Debugging, 2 for CudaMemory Debugging, 0 for off", dest='debug')
 parser.add_argument('--verbose', type=int,
@@ -45,9 +45,9 @@ parser.add_argument('--ndim', type=int,
 parser.add_argument('--seed', type=int,
                         default=10, dest='seed')
 parser.add_argument('--topp', type=float,
-                        default=0.95, dest='topp')       
+                        default=1, dest='topp')       
 parser.add_argument('--temperature', type=float,
-                        default=0.8, dest='temp')                        
+                        default=1, dest='temp')                        
 args = parser.parse_args()
 num_prompts = args.num_prompts
 start_at = args.start_at
@@ -84,6 +84,9 @@ def loadData(promptsource):
 if promptsrc == 0:
     allprompts, taskid = loadData('HumanEval.jsonl')
     sourcename = 'HumanEval'
+elif promptsrc == 1:
+    allprompts, taskid = loadData('domenicrosati/TruthfulQA')
+    sourcename = 'TruthfulQA'
 print(f"data loaded from {sourcename}")
      
 def getDirName(outdir, processrankStr, task, modelname, dirType):
@@ -145,6 +148,36 @@ class StopWordsCriteria(StoppingCriteria):
         return False
 
 
+# class CustomStoppingCriteria(StoppingCriteria):
+#     def __init__(self, tokenizer, max_length=50, stop_strings=None, prompt=None):
+#         self.tokenizer = tokenizer
+#         self.max_length = max_length
+#         self.stop_strings = stop_strings if stop_strings is not None else []
+#         self.stopped = [False] * max_length  # Track stopped sequences
+#         self.prompt = prompt
+
+#     def __call__(self, input_ids, scores, **kwargs):
+#         batch_size = input_ids.shape[0]
+#         for i in range(batch_size):
+#             if self.stopped[i]:
+#                 continue  # Skip already stopped sequences
+#             if len(input_ids[i]) >= self.max_length:
+#                 self.stopped[i] = True
+#             else:
+#                 decoded_seq = self.tokenizer.decode(input_ids[i], skip_special_tokens=True)
+#                 if any(stop_string in decoded_seq for stop_string in self.stop_strings):
+#                     self.stopped[i] = True
+#         return all(self.stopped) #any
+
+# stop_words = ["\n\n#", "\n\ndef"]
+# stop_words_ids = [tokenizer(stop_word, return_tensors='pt', add_special_tokens=False)['input_ids'] for stop_word in stop_words]
+# stopping_criteria = StoppingCriteriaList([StoppingCriteriaSub(stops=stop_words_ids)])
+# custom_stopping_criteria = CustomStoppingCriteria(
+#     max_length=500,
+#     stop_strings=["\n\n#", "\n\ndef"]
+# )
+# stopping_criteria=StoppingCriteriaList([custom_stopping_criteria])
+
 # gen config for _prsample
 gen_config = GenerationConfig(
     temperature=temperature,
@@ -178,7 +211,13 @@ with accelerator.split_between_processes(promptbuff) as prompts:
         
         stop_words=["\n\ndef"]
         custom_stopping_criteria = StopWordsCriteria(stop_words, tokenizer)
-        stopping_criteria=None 
+        # CustomStoppingCriteria(
+        # tokenizer=tokenizer, 
+        # max_length=500,
+        # stop_strings=["\n\n#", "\n\ndef"],
+        # prompt=prompt
+        # )
+        stopping_criteria=None #StoppingCriteriaList([custom_stopping_criteria])
         
         # keep metadata of sample generation
         with open(outdir+'/metadata.txt', "w") as fmeta:

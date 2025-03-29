@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -N detectGPT
+#PBS -o log
+#PBS -j oe
+#PBS -l walltime=10:00:00
+#PBS -q normal
+#PBS -m abe
+#PBS -M whoami@gmail.com
+
+module load cuda/12.2.2
+module load openmpi/4.1.5-gcc11
+source /home/anaconda3/bin/activate
+cd  ${PBS_O_WORKDIR}
+[ -d log ] || mkdir log
+
+mpirun python execute_run.py  --offset 0
